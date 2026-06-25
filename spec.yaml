@@ -10,6 +10,23 @@ commands:
       user: "1000"
       description: Install Deno
     - command: 'echo ''export PATH="$HOME/.deno/bin:$PATH"'' >> /etc/sandbox-persistent.sh && export PATH="$HOME/.deno/bin:$PATH"'
+    # Merge deno hook config into the user-level Claude settings.
+    # Target is /home/agent/.claude/settings.json (created by the claude kit, writable by user 1000)
+    # rather than /workspace/.claude/settings.json because the workspace bind-mount from the host
+    # is not set up yet when install commands run — /workspace is owned by root at this stage.
+    # Uses append-not-replace so other kits' hooks are preserved (mixin-safe).
+    - command: |
+        set -e
+        S=/home/agent/.claude/settings.json
+        [ -f "$S" ] || echo '{}' > "$S"
+        if jq -e '[.hooks.PostToolUse[]?.hooks[]?.command] | any(test("deno-fmt-hook"))' "$S" 2>/dev/null | grep -q true; then
+          echo "Deno kit hooks already present, skipping."
+          exit 0
+        fi
+        H='{"PostToolUse":[{"matcher":"Write|Edit","hooks":[{"type":"command","command":"bash .claude/hooks/deno-fmt-hook.sh"},{"type":"command","command":"bash .claude/hooks/deno-lint-hook.sh"}]}],"Stop":[{"hooks":[{"type":"command","command":"bash .claude/hooks/deno-check-hook.sh"}]}]}'
+        jq --argjson h "$H" '.hooks.PostToolUse=((.hooks.PostToolUse//[])+$h.PostToolUse)|.hooks.Stop=((.hooks.Stop//[])+$h.Stop)' "$S" > "${S}.tmp" && mv "${S}.tmp" "$S"
+        echo "Deno kit hooks installed."
+      user: "1000"
 
 network:
   allowedDomains:
