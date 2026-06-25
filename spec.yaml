@@ -1,0 +1,20 @@
+schemaVersion: "1"
+kind: mixin
+name: deno-project-setup
+displayName: default settings and skills for a deno project, leveraging the deno tool chain
+
+commands:
+  install:
+    - command: "apt-get update && apt-get install -y jq"
+    - command: "curl -fsSL https://deno.land/install.sh | sh -s -- -y"
+      user: "1000"
+      description: Install Deno
+    - command: 'echo ''export PATH="$HOME/.deno/bin:$PATH"'' >> /etc/sandbox-persistent.sh && export PATH="$HOME/.deno/bin:$PATH"'
+
+network:
+  allowedDomains:
+    - "*.deno.land"
+    - "*.deno.com"
+    - "deno.com"
+    - "deno.land"
+    - "jsr.io"
